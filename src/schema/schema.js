@@ -1,5 +1,5 @@
 import { reduce, isArray, isFunction, mapValues } from 'lodash';
-import { toCollectionName } from 'mongoose/lib/utils';
+import { Inflectors } from 'en-inflectors';
 import {
   GraphQLList,
   GraphQLNonNull,
@@ -40,7 +40,7 @@ const idField = {
 function getSingularQueryField(graffitiModel, type, hooks = {}) {
   const { name } = type;
   const { singular } = hooks;
-  const singularName = name.toLowerCase();
+  const singularName = name;
 
   return {
     [singularName]: {
@@ -56,7 +56,7 @@ function getSingularQueryField(graffitiModel, type, hooks = {}) {
 function getPluralQueryField(graffitiModel, type, hooks = {}) {
   const { name } = type;
   const { plural } = hooks;
-  const pluralName = toCollectionName(name);
+  const pluralName = new Inflectors(name).toPlural();
 
   return {
     [pluralName]: {
@@ -86,7 +86,7 @@ function getQueryField(graffitiModel, type, hooks) {
 function getConnectionField(graffitiModel, type, hooks = {}) {
   const { name } = type;
   const { plural } = hooks;
-  const pluralName = toCollectionName(name.toLowerCase());
+  const pluralName = new Inflectors(name).toPlural();
   const { connectionType } = connectionDefinitions({
     name,
     nodeType: type,
