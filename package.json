@@ -1,11 +1,12 @@
 {
-  "name": "@risingstack/graffiti-mongoose",
+  "name": "saas-plat-graffiti-mongoose",
   "version": "6.0.0",
   "description": "Mongoose adapter for graffiti (Node.js GraphQL ORM)",
   "main": "lib/index.js",
   "scripts": {
     "test": "set NODE_ENV=test mocha --compilers js:babel-register 'src/**/*.spec.js'",
     "lint": "eslint src",
+    "pub": "npm publish --registry https://npm.saas-plat.com",
     "prepublish": "npm run build",
     "build": "rm -rf lib/* && babel src --ignore *.spec.js --out-dir lib",
     "coverage": "NODE_ENV=test babel-istanbul cover _mocha 'src/**/*.spec.js'"
