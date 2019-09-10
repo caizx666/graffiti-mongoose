@@ -40,7 +40,7 @@ const idField = {
 function getSingularQueryField(graffitiModel, type, hooks = {}) {
   const { name } = type;
   const { singular } = hooks;
-  const singularName = name;
+  const singularName = new Inflectors(name).toSingular();
 
   return {
     [singularName]: {
