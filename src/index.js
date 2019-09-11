@@ -1,11 +1,14 @@
 import { graphql } from 'graphql';
-import { getTypes } from './type';
+import { createTypeContext } from './type';
 import { getSchema } from './schema';
-import { getModels } from './model';
+import { createModelContext } from './model';
 
-function _getTypes(mongooseModels) {
-  const graffitiModels = getModels(mongooseModels);
-  return getTypes(graffitiModels);
+function _getTypes(mongooseModels, context = {
+  modelContext: createModelContext(),
+  typeContext: createTypeContext(),
+}) {
+  const graffitiModels = context.modelContext.getModels(mongooseModels);
+  return context.typeContext.getTypes(graffitiModels);
 }
 
 export default {

@@ -1,5 +1,7 @@
 import { expect } from 'chai';
-import { extractPath, extractPaths } from './';
+import { createModelContext } from './';
+
+const { extractPath, extractPaths } = createModelContext();
 
 describe('model', () => {
   it('should extract tree chunk from path', () => {

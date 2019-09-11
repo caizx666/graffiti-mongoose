@@ -7,13 +7,14 @@ import {
   GraphQLList,
   GraphQLNonNull
 } from 'graphql/type';
+import { createTypeContext } from './';
 
-import {
+const {
   GraphQLDate,
   GraphQLGeneric,
   getType,
   getTypes
-} from './';
+} = createTypeContext();
 
 describe('type', () => {
   let user;

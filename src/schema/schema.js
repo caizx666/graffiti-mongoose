@@ -16,13 +16,7 @@ import {
   globalIdField
 } from 'graphql-relay';
 import model from './../model';
-import type, {
-  GraphQLViewer,
-  nodeInterface,
-  getTypeFields,
-  getArguments,
-  setTypeFields
-} from './../type';
+import type from './../type';
 import query, {
   idToCursor,
   getIdFetcher,
@@ -53,7 +47,7 @@ function getSingularQueryField(graffitiModel, type, hooks = {}) {
   };
 }
 
-function getPluralQueryField(graffitiModel, type, hooks = {}) {
+function getPluralQueryField(graffitiModel, type, hooks = {}, typeContext) {
   const { name } = type;
   const { plural } = hooks;
   const pluralName = new Inflectors(name).toPlural();
@@ -61,7 +55,7 @@ function getPluralQueryField(graffitiModel, type, hooks = {}) {
   return {
     [pluralName]: {
       type: new GraphQLList(type),
-      args: getArguments(type, {
+      args: typeContext.getArguments(type, {
         id: {
           type: new GraphQLList(GraphQLID),
           description: `The ID of a ${name}`
@@ -76,14 +70,14 @@ function getPluralQueryField(graffitiModel, type, hooks = {}) {
   };
 }
 
-function getQueryField(graffitiModel, type, hooks) {
+function getQueryField(graffitiModel, type, hooks, typeContext) {
   return {
-    ...getSingularQueryField(graffitiModel, type, hooks),
-    ...getPluralQueryField(graffitiModel, type, hooks)
+    ...getSingularQueryField(graffitiModel, type, hooks, typeContext),
+    ...getPluralQueryField(graffitiModel, type, hooks, typeContext)
   };
 }
 
-function getConnectionField(graffitiModel, type, hooks = {}) {
+function getConnectionField(graffitiModel, type, hooks = {}, typeContext) {
   const { name } = type;
   const { plural } = hooks;
   const pluralName = new Inflectors(name).toPlural();
@@ -100,18 +94,18 @@ function getConnectionField(graffitiModel, type, hooks = {}) {
 
   return {
     [pluralName]: {
-      args: getArguments(type, connectionArgs),
+      args: typeContext.getArguments(type, connectionArgs),
       type: connectionType,
       resolve: addHooks((rootValue, args, info) => connectionFromModel(graffitiModel, args, info), plural)
     }
   };
 }
 
-function getMutationField(graffitiModel, type, viewer, hooks = {}, allowMongoIDMutation) {
+function getMutationField(graffitiModel, type, viewer, hooks = {}, allowMongoIDMutation, typeContext) {
   const { name } = type;
   const { mutation } = hooks;
 
-  const fields = getTypeFields(type);
+  const fields = typeContext.getTypeFields(type);
   const inputFields = reduce(fields, (inputFields, field) => {
     if (field.type instanceof GraphQLObjectType) {
       if (field.type.name.endsWith('Connection')) {
@@ -230,9 +224,10 @@ function getMutationField(graffitiModel, type, viewer, hooks = {}, allowMongoIDM
  */
 function getFields(graffitiModels, {
     hooks = {}, mutation = true, allowMongoIDMutation = false,
-    customQueries = {}, customMutations = {}
+    customQueries = {}, customMutations = {},
+    typeContext = type.createTypeContext(),
   } = {}) {
-  const types = type.getTypes(graffitiModels);
+  const types = typeContext.getTypes(graffitiModels);
   const { viewer, singular } = hooks;
 
   const viewerFields = reduce(types, (fields, type, key) => {
@@ -240,17 +235,17 @@ function getFields(graffitiModels, {
     const graffitiModel = graffitiModels[type.name];
     return {
       ...fields,
-      ...getConnectionField(graffitiModel, type, hooks),
-      ...getSingularQueryField(graffitiModel, type, hooks)
+      ...getConnectionField(graffitiModel, type, hooks, typeContext),
+      ...getSingularQueryField(graffitiModel, type, hooks, typeContext)
     };
   }, {
     id: globalIdField('Viewer')
   });
-  setTypeFields(GraphQLViewer, viewerFields);
+  typeContext.setTypeFields(typeContext.GraphQLViewer, viewerFields);
 
   const viewerField = {
     name: 'Viewer',
-    type: GraphQLViewer,
+    type: typeContext.GraphQLViewer,
     resolve: addHooks(() => viewerInstance, viewer)
   };
 
@@ -260,11 +255,11 @@ function getFields(graffitiModels, {
     return {
       queries: {
         ...queries,
-        ...getQueryField(graffitiModel, type, hooks)
+        ...getQueryField(graffitiModel, type, hooks, typeContext)
       },
       mutations: {
         ...mutations,
-        ...getMutationField(graffitiModel, type, viewerField, hooks, allowMongoIDMutation)
+        ...getMutationField(graffitiModel, type, viewerField, hooks, allowMongoIDMutation, typeContext)
       }
     };
   }, {
@@ -284,7 +279,7 @@ function getFields(graffitiModels, {
       node: {
         name: 'node',
         description: 'Fetches an object given its ID',
-        type: nodeInterface,
+        type: typeContext.nodeInterface,
         args: {
           id: {
             type: new GraphQLNonNull(GraphQLID),
@@ -322,7 +317,7 @@ function getSchema(mongooseModels, options) {
   if (!isArray(mongooseModels)) {
     mongooseModels = [mongooseModels];
   }
-  const graffitiModels = model.getModels(mongooseModels);
+  const graffitiModels = (options.modelContext || model.createModelContext()).getModels(mongooseModels);
   const fields = getFields(graffitiModels, options);
   return new GraphQLSchema(fields);
 }
