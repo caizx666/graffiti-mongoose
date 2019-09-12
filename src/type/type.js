@@ -26,7 +26,7 @@ import GraphQLBuffer from './custom/buffer';
 import GraphQLGeneric from './custom/generic';
 import { connectionFromModel, getOneResolver } from '../query';
 
-function createTypeContext() {
+function createTypeContext(cache) {
   // Registered types will be saved, we can access them later to resolve types
   const types = [];
 
@@ -298,14 +298,28 @@ function createTypeContext() {
 
   function getTypes(graffitiModels) {
     const types = reduce(graffitiModels, (types, model) => {
-      types[model.name] = getType(graffitiModels, model);
+      // 如果有缓存走缓存
+      let type;
+      if (cache) {
+        type = cache.get(model.key);
+        if (!type) {
+          type = getType(graffitiModels, model);
+          cache.set(model.key, type);
+        } else {
+          cache.ttl();
+        }
+      } else {
+        type = getType(graffitiModels, model);
+      }
+      types[model.name] = type;
       return types;
     }, {});
 
     // Resolve references, all types are defined / avaiable
     forEach(resolveReference, (fields, typeName) => {
+      // 缓存不处理引用
       const type = types[typeName];
-      if (type) {
+      if ((cache ? !cache.has(typeName) : true) && type) {
         const typeFields = reduce(fields, (typeFields, field, fieldName) => {
           if (field.args === connectionArgs) {
             // It's a connection

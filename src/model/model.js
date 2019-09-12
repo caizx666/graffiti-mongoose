@@ -128,10 +128,12 @@ function createModelContext() {
   function getModel(model) {
     const schemaPaths = model.schema.paths;
     const name = model.modelName;
+    const key = model.schema.get('key');
 
     const fields = extractPaths(schemaPaths, { name });
 
     return {
+      key,
       name,
       fields,
       model
