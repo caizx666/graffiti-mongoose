@@ -1,5 +1,7 @@
 import { reduce, isArray, isFunction, mapValues } from 'lodash';
 import { Inflectors } from 'en-inflectors';
+import stringHash from 'string-hash';
+import NodeCache from 'node-cache';
 import {
   GraphQLList,
   GraphQLNonNull,
@@ -30,6 +32,11 @@ const idField = {
   name: 'id',
   type: new GraphQLNonNull(GraphQLID)
 };
+
+const schemaCache = new NodeCache({
+  stdTTL: process.env.GQL_SCHEMA_TIMEOUT || 60 * 60, // 1h
+  useClones: false,
+});
 
 function getSingularQueryField(graffitiModel, type, hooks = {}) {
   const { name } = type;
@@ -317,10 +324,24 @@ function getSchema(mongooseModels, options) {
   if (!isArray(mongooseModels)) {
     mongooseModels = [mongooseModels];
   }
+  let schema;
+  const haskey = stringHash(mongooseModels.map((model) => model.modelName).join('#'));
+  const cache = options.schemaCache || schemaCache;
+  if (cache) {
+    schema = cache.get(haskey);
+    if (schema) {
+      cache.ttl(haskey);
+      return schema;
+    }
+  }
   const graffitiModels = (options.modelContext ||
     model.createModelContext(options.modelCache)).getModels(mongooseModels);
   const fields = getFields(graffitiModels, options);
-  return new GraphQLSchema(fields);
+  schema = new GraphQLSchema(fields);
+  if (cache) {
+    cache.set(haskey, schema);
+  }
+  return schema;
 }
 
 export {

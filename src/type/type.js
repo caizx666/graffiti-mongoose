@@ -3,6 +3,7 @@ import {
   forEach,
   isFunction
 } from 'lodash';
+import NodeCache from 'node-cache';
 import {
   globalIdField,
   connectionArgs,
@@ -26,7 +27,12 @@ import GraphQLBuffer from './custom/buffer';
 import GraphQLGeneric from './custom/generic';
 import { connectionFromModel, getOneResolver } from '../query';
 
-function createTypeContext(cache) {
+const typeCache = new NodeCache({
+  stdTTL: process.env.GQL_TYPE_TIMEOUT || 60 * 60, // 1h
+  useClones: false,
+});
+
+function createTypeContext(cache = typeCache) {
   // Registered types will be saved, we can access them later to resolve types
   const types = [];
 
@@ -306,7 +312,7 @@ function createTypeContext(cache) {
           type = getType(graffitiModels, model);
           cache.set(model.key, type);
         } else {
-          cache.ttl();
+          cache.ttl(model.key);
         }
       } else {
         type = getType(graffitiModels, model);

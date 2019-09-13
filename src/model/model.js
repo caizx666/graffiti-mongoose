@@ -1,7 +1,13 @@
 import { reduce, reduceRight, merge } from 'lodash';
 import mongoose from 'mongoose';
+import NodeCache from 'node-cache';
 
-function createModelContext() {
+const modelCache = new NodeCache({
+  stdTTL: process.env.GQL_MODEL_TIMEOUT || 60 * 60, // 1h
+  useClones: false,
+});
+
+function createModelContext(cache = modelCache) {
   const embeddedModels = {};
 
   /**
@@ -126,18 +132,29 @@ function createModelContext() {
    * @return {Object} graffiti model
    */
   function getModel(model) {
+    const key = model.modelName;
+    let gmodel;
+    if (cache) {
+      gmodel = cache.get(key);
+      if (gmodel) {
+        cache.ttl(key);
+        return gmodel;
+      }
+    }
+    const name = model.schema.get('name') || key;
     const schemaPaths = model.schema.paths;
-    const name = model.modelName;
-    const key = model.schema.get('key');
-
     const fields = extractPaths(schemaPaths, { name });
-
-    return {
+    gmodel = {
       key,
       name,
       fields,
       model
     };
+
+    if (cache) {
+      cache.set(key, gmodel);
+    }
+    return gmodel;
   }
 
   /**
