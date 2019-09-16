@@ -325,7 +325,7 @@ function createTypeContext(cache = typeCache) {
     forEach(resolveReference, (fields, typeName) => {
       // 缓存不处理引用
       const type = types[typeName];
-      if ((cache ? !cache.has(typeName) : true) && type) {
+      if ((cache ? !cache.get(typeName) : true) && type) {
         const typeFields = reduce(fields, (typeFields, field, fieldName) => {
           if (field.args === connectionArgs) {
             // It's a connection
