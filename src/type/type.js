@@ -392,5 +392,6 @@ function createTypeContext(cache = typeCache) {
 }
 
 export default {
+  typeCache,
   createTypeContext
 };

@@ -232,7 +232,7 @@ function getMutationField(graffitiModel, type, viewer, hooks = {}, allowMongoIDM
 function getFields(graffitiModels, {
     hooks = {}, mutation = true, allowMongoIDMutation = false,
     customQueries = {}, customMutations = {},
-    typeCache, typeContext = type.createTypeContext(typeCache),
+    typeCache = type.typeCache, typeContext = type.createTypeContext(typeCache),
   } = {}) {
   const types = typeContext.getTypes(graffitiModels);
   const { viewer, singular } = hooks;
@@ -335,7 +335,7 @@ function getSchema(mongooseModels, options) {
     }
   }
   const graffitiModels = (options.modelContext ||
-    model.createModelContext(options.modelCache)).getModels(mongooseModels);
+    model.createModelContext(options.modelCache || model.modelCache)).getModels(mongooseModels);
   const fields = getFields(graffitiModels, options);
   schema = new GraphQLSchema(fields);
   if (cache) {

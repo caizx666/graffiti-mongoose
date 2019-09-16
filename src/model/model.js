@@ -180,5 +180,6 @@ function createModelContext(cache = modelCache) {
 }
 
 export default {
+  modelCache,
   createModelContext
 };
