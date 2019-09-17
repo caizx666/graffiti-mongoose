@@ -287,7 +287,7 @@ function createTypeContext(cache = typeCache) {
       }
 
       graphQLFields[name] = graphQLField;
-      debug('create graphQLField', name, graphQLField);
+      // debug('create graphQLField', name, graphQLField);
       return graphQLFields;
     }, {});
 
@@ -313,6 +313,8 @@ function createTypeContext(cache = typeCache) {
 
   function getTypes(graffitiModels) {
     debug('context #%s', cid);
+    const reResolveTypes = [];
+
     const types = reduce(graffitiModels, (types, model) => {
       // 如果有缓存走缓存
       let type;
@@ -329,6 +331,7 @@ function createTypeContext(cache = typeCache) {
             const graphQLType = { ...type._typeConfig };
             graphQLType.interfaces = [nodeInterface];
             type = new GraphQLObjectType(graphQLType);
+            reResolveTypes.push(type.name);
             addType(model.name, type);
             debug('recreate', type);
           } else {
@@ -345,19 +348,14 @@ function createTypeContext(cache = typeCache) {
       return types;
     }, {});
 
-    debug(Object.keys(types));
-    const nodes = Object.keys(types).map((key) => types[key]._typeConfig.interfaces[0]);
-    if (nodes.length === 2) {
-      debug(nodes[0] === nodes[1]);
-      debug(nodes[0] === nodeInterface);
-      debug(nodes[1] === nodeInterface);
-    }
-
     // Resolve references, all types are defined / avaiable
     forEach(resolveReference, (fields, typeName) => {
       // 缓存不处理引用
+      if (reResolveTypes.indexOf(typeName) > -1) {
+        return;
+      }
       const type = types[typeName];
-      if ((cache ? !cache.get(typeName) : true) && type) {
+      if (type) {
         const typeFields = reduce(fields, (typeFields, field, fieldName) => {
           if (field.args === connectionArgs) {
             // It's a connection
@@ -382,6 +380,7 @@ function createTypeContext(cache = typeCache) {
           const path = fieldName.split('.');
 
           path.reduce((parent, segment, idx) => {
+            // debug(parent[segment]);
             if (parent[segment]) {
               if (parent[segment].type instanceof GraphQLObjectType) {
                 parent = getTypeFields(parent[segment].type);
@@ -398,6 +397,7 @@ function createTypeContext(cache = typeCache) {
             return parent;
           }, typeFields);
 
+          debug('resolve reference filed...', field);
           return typeFields;
         }, getTypeFields(type));
 
