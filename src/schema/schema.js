@@ -28,6 +28,8 @@ import { addHooks } from '../utils';
 import viewerInstance from '../model/viewer';
 import createInputObject from '../type/custom/to-input-object';
 
+const debug = require('debug')('graffiti-mongoose:schema');
+
 const idField = {
   name: 'id',
   type: new GraphQLNonNull(GraphQLID)
@@ -232,9 +234,10 @@ function getMutationField(graffitiModel, type, viewer, hooks = {}, allowMongoIDM
 function getFields(graffitiModels, {
     hooks = {}, mutation = true, allowMongoIDMutation = false,
     customQueries = {}, customMutations = {},
-    typeCache = type.typeCache, typeContext = type.createTypeContext(typeCache),
+    typeContext,
   } = {}) {
   const types = typeContext.getTypes(graffitiModels);
+  debug('load schema types...', types);
   const { viewer, singular } = hooks;
 
   const viewerFields = reduce(types, (fields, type, key) => {
@@ -325,19 +328,27 @@ function getSchema(mongooseModels, options) {
     mongooseModels = [mongooseModels];
   }
   let schema;
-  const haskey = stringHash(mongooseModels.map((model) => model.modelName).join('#'));
+  const haskey = options.cacheKey ||
+    stringHash(mongooseModels.map((model) => model.versionedName || model.modelName).join('#'));
   const cache = options.schemaCache || schemaCache;
   if (cache) {
     schema = cache.get(haskey);
     if (schema) {
       cache.ttl(haskey);
+      debug('cache', haskey);
       return schema;
     }
   }
-  const graffitiModels = (options.modelContext ||
-    model.createModelContext(options.modelCache || model.modelCache)).getModels(mongooseModels);
-  const fields = getFields(graffitiModels, options);
+  // 每次查询都会建立一个context，从cache中填充model和type
+  const modelCache = options.modelCache || model.modelCache;
+  const modelContext = options.modelContext || model.createModelContext(modelCache);
+  const typeCache = options.typeCache || type.typeCache;
+  const typeContext = options.typeContext || type.createTypeContext(typeCache);
+  const graffitiModels = modelContext.getModels(mongooseModels);
+  const fields = getFields(graffitiModels, { ...options, typeContext });
+  debug('load fields', fields);
   schema = new GraphQLSchema(fields);
+  debug('create', schema);
   if (cache) {
     cache.set(haskey, schema);
   }

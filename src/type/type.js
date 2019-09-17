@@ -27,12 +27,19 @@ import GraphQLBuffer from './custom/buffer';
 import GraphQLGeneric from './custom/generic';
 import { connectionFromModel, getOneResolver } from '../query';
 
+const debug = require('debug')('graffiti-mongoose:type');
+
 const typeCache = new NodeCache({
   stdTTL: process.env.GQL_TYPE_TIMEOUT || 60 * 60, // 1h
   useClones: false,
 });
 
+let CID = 0;
+
 function createTypeContext(cache = typeCache) {
+  const cid = CID += 1;
+  debug('type context #%s', cid);
+
   // Registered types will be saved, we can access them later to resolve types
   const types = [];
 
@@ -42,6 +49,7 @@ function createTypeContext(cache = typeCache) {
    * @param {GraphQLType} type
    */
   function addType(name, type) {
+    debug('+', name, type);
     types[name] = type;
   }
 
@@ -279,6 +287,7 @@ function createTypeContext(cache = typeCache) {
       }
 
       graphQLFields[name] = graphQLField;
+      debug('create graphQLField', name, graphQLField);
       return graphQLFields;
     }, {});
 
@@ -303,6 +312,7 @@ function createTypeContext(cache = typeCache) {
   }
 
   function getTypes(graffitiModels) {
+    debug('context #%s', cid);
     const types = reduce(graffitiModels, (types, model) => {
       // 如果有缓存走缓存
       let type;
@@ -311,15 +321,37 @@ function createTypeContext(cache = typeCache) {
         if (!type) {
           type = getType(graffitiModels, model);
           cache.set(model.key, type);
+          debug('create', type);
         } else {
+          // Node 不能共用有作用范围限制
+          if (type._typeConfig.interfaces[0] !== nodeInterface) {
+            // 所以这里重建了root的type
+            const graphQLType = { ...type._typeConfig };
+            graphQLType.interfaces = [nodeInterface];
+            type = new GraphQLObjectType(graphQLType);
+            addType(model.name, type);
+            debug('recreate', type);
+          } else {
+            // addType(model.name, type);
+            debug('cache', type);
+          }
           cache.ttl(model.key);
         }
       } else {
         type = getType(graffitiModels, model);
+        debug('create', type);
       }
       types[model.name] = type;
       return types;
     }, {});
+
+    debug(Object.keys(types));
+    const nodes = Object.keys(types).map((key) => types[key]._typeConfig.interfaces[0]);
+    if (nodes.length === 2) {
+      debug(nodes[0] === nodes[1]);
+      debug(nodes[0] === nodeInterface);
+      debug(nodes[1] === nodeInterface);
+    }
 
     // Resolve references, all types are defined / avaiable
     forEach(resolveReference, (fields, typeName) => {
