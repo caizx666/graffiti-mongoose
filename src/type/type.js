@@ -285,7 +285,7 @@ function createTypeContext(cache = typeCache) {
     if (root) {
       // Implement the Node interface
       graphQLType.interfaces = [nodeInterface];
-      graphQLTypeFields.id = globalIdField(name, (obj) => obj._id);
+      graphQLTypeFields.id = globalIdField(name, (obj) => (fields.id ? obj.id : obj._id));
     }
 
     // Add fields to the GraphQL type
