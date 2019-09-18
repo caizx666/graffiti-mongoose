@@ -27,12 +27,19 @@ import GraphQLBuffer from './custom/buffer';
 import GraphQLGeneric from './custom/generic';
 import { connectionFromModel, getOneResolver } from '../query';
 
+const debug = require('debug')('graffiti-mongoose:type');
+
 const typeCache = new NodeCache({
   stdTTL: process.env.GQL_TYPE_TIMEOUT || 60 * 60, // 1h
   useClones: false,
 });
 
+let CID = 0;
+
 function createTypeContext(cache = typeCache) {
+  const cid = CID += 1;
+  debug('type context #%s', cid);
+
   // Registered types will be saved, we can access them later to resolve types
   const types = [];
 
@@ -42,6 +49,7 @@ function createTypeContext(cache = typeCache) {
    * @param {GraphQLType} type
    */
   function addType(name, type) {
+    debug('+', name, type);
     types[name] = type;
   }
 
@@ -279,6 +287,7 @@ function createTypeContext(cache = typeCache) {
       }
 
       graphQLFields[name] = graphQLField;
+      // debug('create graphQLField', name, graphQLField);
       return graphQLFields;
     }, {});
 
@@ -303,6 +312,9 @@ function createTypeContext(cache = typeCache) {
   }
 
   function getTypes(graffitiModels) {
+    debug('context #%s', cid);
+    const reResolveTypes = [];
+
     const types = reduce(graffitiModels, (types, model) => {
       // 如果有缓存走缓存
       let type;
@@ -311,11 +323,26 @@ function createTypeContext(cache = typeCache) {
         if (!type) {
           type = getType(graffitiModels, model);
           cache.set(model.key, type);
+          debug('create', type);
         } else {
+          // Node 不能共用有作用范围限制
+          if (type._typeConfig.interfaces[0] !== nodeInterface) {
+            // 所以这里重建了root的type
+            const graphQLType = { ...type._typeConfig };
+            graphQLType.interfaces = [nodeInterface];
+            type = new GraphQLObjectType(graphQLType);
+            reResolveTypes.push(type.name);
+            addType(model.name, type);
+            debug('recreate', type);
+          } else {
+            // addType(model.name, type);
+            debug('cache', type);
+          }
           cache.ttl(model.key);
         }
       } else {
         type = getType(graffitiModels, model);
+        debug('create', type);
       }
       types[model.name] = type;
       return types;
@@ -324,8 +351,11 @@ function createTypeContext(cache = typeCache) {
     // Resolve references, all types are defined / avaiable
     forEach(resolveReference, (fields, typeName) => {
       // 缓存不处理引用
+      if (reResolveTypes.indexOf(typeName) > -1) {
+        return;
+      }
       const type = types[typeName];
-      if ((cache ? !cache.has(typeName) : true) && type) {
+      if (type) {
         const typeFields = reduce(fields, (typeFields, field, fieldName) => {
           if (field.args === connectionArgs) {
             // It's a connection
@@ -350,6 +380,7 @@ function createTypeContext(cache = typeCache) {
           const path = fieldName.split('.');
 
           path.reduce((parent, segment, idx) => {
+            // debug(parent[segment]);
             if (parent[segment]) {
               if (parent[segment].type instanceof GraphQLObjectType) {
                 parent = getTypeFields(parent[segment].type);
@@ -366,6 +397,7 @@ function createTypeContext(cache = typeCache) {
             return parent;
           }, typeFields);
 
+          debug('resolve reference filed...', field);
           return typeFields;
         }, getTypeFields(type));
 
@@ -392,5 +424,6 @@ function createTypeContext(cache = typeCache) {
 }
 
 export default {
+  typeCache,
   createTypeContext
 };

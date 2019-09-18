@@ -1,6 +1,6 @@
 {
   "name": "saas-plat-graffiti-mongoose",
-  "version": "6.0.8",
+  "version": "6.0.13",
   "description": "Mongoose adapter for graffiti (Node.js GraphQL ORM)",
   "main": "lib/index.js",
   "scripts": {
@@ -9,6 +9,7 @@
     "pub": "npm publish --registry https://npm.saas-plat.com",
     "prepublish": "npm run build",
     "build": "rm -rf lib/* && babel src --ignore *.spec.js --out-dir lib",
+    "dev": "babel src --ignore *.spec.js --out-dir ../saas-plat-query/node_modules/saas-plat-graffiti-mongoose/lib",
     "coverage": "NODE_ENV=test babel-istanbul cover _mocha 'src/**/*.spec.js'"
   },
   "author": "RisingStack",
@@ -30,6 +31,7 @@
   ],
   "dependencies": {
     "babel-runtime": "6.22.0",
+    "debug": "^4.1.1",
     "en-inflectors": "^1.0.12",
     "graphql-relay": "0.5.1",
     "lodash": "4.17.4",

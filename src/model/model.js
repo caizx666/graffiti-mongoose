@@ -2,12 +2,19 @@ import { reduce, reduceRight, merge } from 'lodash';
 import mongoose from 'mongoose';
 import NodeCache from 'node-cache';
 
+const debug = require('debug')('graffiti-mongoose:model');
+
 const modelCache = new NodeCache({
   stdTTL: process.env.GQL_MODEL_TIMEOUT || 60 * 60, // 1h
   useClones: false,
 });
 
+let CID = 0;
+
 function createModelContext(cache = modelCache) {
+  CID += 1;
+  debug('model context #%s', CID);
+
   const embeddedModels = {};
 
   /**
@@ -138,6 +145,7 @@ function createModelContext(cache = modelCache) {
       gmodel = cache.get(key);
       if (gmodel) {
         cache.ttl(key);
+        debug('cache', key);
         return gmodel;
       }
     }
@@ -151,9 +159,12 @@ function createModelContext(cache = modelCache) {
       model
     };
 
+    debug('create', gmodel);
+
     if (cache) {
       cache.set(key, gmodel);
     }
+
     return gmodel;
   }
 
@@ -180,5 +191,6 @@ function createModelContext(cache = modelCache) {
 }
 
 export default {
+  modelCache,
   createModelContext
 };
