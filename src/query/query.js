@@ -5,6 +5,8 @@ import getFilterObject from './selector';
 import getSortObject from './sort';
 import viewer from '../model/viewer';
 
+const debug = require('debug')('graffiti-mongoose:query');
+
 function processId({ id, _id = id }) {
   // global or mongo id
   if (isString(_id) && !/^[a-fA-F0-9]{24}$/.test(_id)) {
@@ -113,6 +115,7 @@ function getList(Collection, selector, options = {}, context, info = null) {
   }
 
   const projection = getFieldList(info);
+  debug(JSON.stringify(selector, null, 2));
   return Collection.find(selector, projection, options).then((result) => (
     result.map((value) => ({
       ...value.toObject(),
@@ -174,10 +177,11 @@ function getListResolver(graffitiModel) {
       args.id = ids;
     }
 
-    const { limit, skip } = args;
+    const { sort: sortObj, limit, skip, query } = args;
+
     // 从info里收集字段参数组成
-    const selector = getFilterObject(info);
-    const sort = getSortObject(info);
+    const selector = query ? { $and: [query, getFilterObject(info)] } : getFilterObject(info);
+    const sort = sortObj ? { ...sortObj, ...getSortObject(info) } : getSortObject(info);
 
     const Collection = graffitiModel.model;
     if (Collection) {

@@ -1,8 +1,11 @@
 import {
   orderBy
 } from 'lodash';
+import {
+  parseValue
+} from '../../utils';
 
-function getSortObject(info, fieldNodes) {
+function getSortObject(info, fieldNodes, parentName) {
   if (!info) {
     return {};
   }
@@ -31,6 +34,7 @@ function getSortObject(info, fieldNodes) {
       name,
       kind
     } = ast;
+    const prefix = (parentName ? `${parentName}.` : '') + name.value;
     const args = ast.arguments;
     let sortArg;
     let orderArg;
@@ -46,22 +50,22 @@ function getSortObject(info, fieldNodes) {
         }
         return [
           ...list,
-          ...getSortObject(info, ast),
+          ...getSortObject(info, ast, prefix),
           {
-            name: sortArg.name.value,
-            value: parseInt(sortArg.value.value, 10) || 1,
+            name: prefix,
+            value: parseInt(parseValue(info, sortArg.value), 10) || 1,
             order: orderArg ? parseInt(orderArg.value.value, 10) : Infinity,
           }
         ];
       case 'InlineFragment':
         return [
           ...list,
-          ...getSortObject(info, ast)
+          ...getSortObject(info, ast, prefix)
         ];
       case 'FragmentSpread':
         return [
           ...list,
-          ...getSortObject(info, info.fragments[name.value])
+          ...getSortObject(info, info.fragments[name.value], prefix)
         ];
       default:
         throw new Error('Unsuported query selection');

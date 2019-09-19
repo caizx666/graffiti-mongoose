@@ -20,7 +20,10 @@ import {
   GraphQLObjectType,
   GraphQLNonNull,
   GraphQLScalarType,
-  GraphQLEnumType
+  GraphQLEnumType,
+  GraphQLInputObjectType,
+  isInputObjectType,
+  isScalarType
 } from 'graphql/type';
 import { addHooks } from '../utils';
 import GraphQLDate from './custom/date';
@@ -100,6 +103,10 @@ function createTypeContext(cache = typeCache) {
     interfaces: [nodeInterface]
   });
 
+
+  const orderByTypes = {};
+  const inputByTypes = {};
+
   // Register Viewer type
   addType('Viewer', GraphQLViewer);
 
@@ -160,8 +167,6 @@ function createTypeContext(cache = typeCache) {
     type._typeConfig.fields = () => fields;
   }
 
-  const orderByTypes = {};
-
   /**
    * Returns order by GraphQLEnumType for fields
    * @param  {{String}} {name}
@@ -195,6 +200,29 @@ function createTypeContext(cache = typeCache) {
       });
     }
     return orderByTypes[name];
+  }
+
+  function createInputObject(type) {
+    if (type instanceof GraphQLNonNull) {
+      type = type.ofType;
+    }
+    if (isInputObjectType(type) || isScalarType(type)) {
+      return type;
+    }
+    const { name } = type;
+    if (!inputByTypes[name]) {
+      const fields = getTypeFields(type);
+      debug('create input', name);
+      inputByTypes[name] = new GraphQLInputObjectType({
+        name: `inputBy${name}`,
+        fields: reduce(fields, (inputs, field) => ({
+          ...inputs,
+          [field.name]: { type: createInputObject(field.type) }
+        }), {})
+      });
+      // debug(getTypeFields(inputByTypes[name]));
+    }
+    return inputByTypes[name];
   }
 
   /**
@@ -332,21 +360,27 @@ function createTypeContext(cache = typeCache) {
         ...args,
         all: {
           name: 'all',
-          type: type.ofType,
+          type: new GraphQLList(createInputObject(type.ofType)),
           description: 'Matches arrays that contain all elements specified in the query.'
-        },
-        elemMatch: {
-          name: 'elemMatch',
-          type: type.ofType,
-          description:
-          'Selects documents if element in the array field matches all the specified $elemMatch conditions.'
         },
         size: {
           name: 'size',
-          type: type.ofType,
+          type: GraphQLInt,
           description: 'Selects documents if the array field is a specified size.'
         }
       };
+      if (type instanceof GraphQLObjectType) {
+        // 引用的对象不能过滤
+        args = {
+          ...args,
+          elemMatch: {
+            name: 'elemMatch',
+            type: createInputObject(type.ofType),
+            description:
+            'Selects documents if element in the array field matches all the specified $elemMatch conditions.'
+          }
+        };
+      }
     }
 
     return args;
