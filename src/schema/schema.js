@@ -9,7 +9,8 @@ import {
   GraphQLObjectType,
   GraphQLSchema,
   GraphQLBoolean,
-  GraphQLFloat
+  GraphQLFloat,
+  GraphQLInt
 } from 'graphql';
 import {
   mutationWithClientMutationId,
@@ -72,6 +73,14 @@ function getPluralQueryField(graffitiModel, type, hooks = {}, typeContext) {
         ids: {
           type: new GraphQLList(GraphQLID),
           description: `The ID of a ${name}`
+        },
+        limit: {
+          type: GraphQLInt,
+          description: 'Number of records read'
+        },
+        skip: {
+          type: GraphQLInt,
+          description: 'Number of records skipped'
         }
       }),
       resolve: addHooks(query.getListResolver(graffitiModel), plural)

@@ -11,6 +11,7 @@ import {
   nodeDefinitions
 } from 'graphql-relay';
 import {
+  GraphQLInt,
   GraphQLString,
   GraphQLFloat,
   GraphQLBoolean,
@@ -35,6 +36,40 @@ const typeCache = new NodeCache({
 });
 
 let CID = 0;
+
+// $or Joins query clauses with a logical OR returns all documents that match the conditions of either clause.
+// $and Joins query clauses with a logical AND returns all documents that match the conditions of both clauses.
+// $not Inverts the effect of a query expression and returns documents that do not match the query expression.
+// $nor Joins query clauses with a logical NOR returns all documents that fail to match both clauses.
+const GraphQLLogical = new GraphQLEnumType({
+  name: 'op',
+  values: {
+    and: {
+      value: 'and'
+    },
+    or: {
+      value: 'or'
+    },
+    not: {
+      value: 'not'
+    },
+    nor: {
+      value: 'nor'
+    }
+  }
+});
+
+const GraphQLSort = new GraphQLEnumType({
+  name: 'sort',
+  values: {
+    desc: {
+      value: -1
+    },
+    asc: {
+      value: 1
+    }
+  }
+});
 
 function createTypeContext(cache = typeCache) {
   const cid = CID += 1;
@@ -126,6 +161,7 @@ function createTypeContext(cache = typeCache) {
   }
 
   const orderByTypes = {};
+
   /**
    * Returns order by GraphQLEnumType for fields
    * @param  {{String}} {name}
@@ -168,26 +204,152 @@ function createTypeContext(cache = typeCache) {
    * @return {Object}
    */
   function getArguments(type, args = {}) {
+    // 字段里添加过滤条件和排序会导致字段必须显示才能过滤和排序
+    // 只排序不显示的字段就需要在type上添加参数
     const fields = getTypeFields(type);
 
     return reduce(fields, (args, field) => {
+      if (field.name === '_id' || field.name === 'id') {
+        return args;
+      }
+
       // Extract non null fields, those are not required in the arguments
-      if (field.type instanceof GraphQLNonNull && field.name !== 'id') {
+      if (field.type instanceof GraphQLNonNull) {
         field.type = field.type.ofType;
       }
 
       if (field.type instanceof GraphQLScalarType) {
+        // TODO 增加比较符
+        // $eq    Matches values that are equal to a specified value.
+        // $gt    Matches values that are greater than a specified value.
+        // $gte    Matches values that are greater than or equal to a specified value.
+        // $lt    Matches values that are less than a specified value.
+        // $lte    Matches values that are less than or equal to a specified value.
+        // $ne    Matches all values that are not equal to a specified value.
+        // $in    Matches any of the values specified in an array.
+        // $nin    Matches none of the values specified in an array.
         args[field.name] = field;
       }
+
+      // TODO 增加对象和数组的过滤
 
       return args;
     }, {
       ...args,
-      orderBy: {
-        name: 'orderBy',
+      // TODO 排序需要增加多个字段排序
+      sort: {
+        name: 'sort',
         type: getOrderByType(type, fields)
       }
     });
+  }
+
+  /**
+   * Returns query arguments for a field
+   * @param  {Object} field
+   * @param  {Object} args
+   * @return {Object}
+   */
+  function getFieldArguments(field, args = {}) {
+    // 字段参数是一种便捷的过滤和排序写法，只需要标注在每个字段上即可
+    if (field.name === '_id' || field.name === 'id') {
+      return args;
+    }
+
+    let type = field.type;
+    // Extract non null fields, those are not required in the arguments
+    if (type instanceof GraphQLNonNull) {
+      type = type.ofType;
+    }
+
+    if (type instanceof GraphQLScalarType || type instanceof GraphQLEnumType) {
+      args = {
+        ...args,
+        eq: {
+          name: 'eq',
+          type,
+          description: 'Matches values that are equal to a specified value.'
+        },
+        gt: {
+          name: 'gt',
+          type,
+          description: 'Matches values that are greater than a specified value.'
+        },
+        gte: {
+          name: 'gte',
+          type,
+          description: 'Matches values that are greater than or equal to a specified value.'
+        },
+        lt: {
+          name: 'lt',
+          type,
+          description: 'Matches values that are less than a specified value.'
+        },
+        lte: {
+          name: 'lte',
+          type,
+          description: 'Matches values that are less than or equal to a specified value.'
+        },
+        ne: {
+          name: 'ne',
+          type,
+          description: 'Matches all values that are not equal to a specified value.'
+        },
+        in: {
+          name: 'in',
+          type: new GraphQLList(type),
+          description: 'Matches any of the values specified in an array.'
+        },
+        nin: {
+          name: 'nin',
+          type: new GraphQLList(type),
+          description: 'Matches none of the values specified in an array.'
+        },
+        op: {
+          name: 'op',
+          type: GraphQLLogical,
+          description: 'Logical relations among multiple matches.'
+        },
+      };
+
+      args = {
+        ...args,
+        sort: {
+          name: 'sort',
+          type: GraphQLSort,
+          description: 'A document that defines the sort order of the result set.'
+        },
+        sortOrder: {
+          name: 'sortOrder',
+          type: GraphQLInt,
+          description: 'Sort order from small to large execution.'
+        },
+      };
+    }
+
+    if (type instanceof GraphQLList) {
+      args = {
+        ...args,
+        all: {
+          name: 'all',
+          type: type.ofType,
+          description: 'Matches arrays that contain all elements specified in the query.'
+        },
+        elemMatch: {
+          name: 'elemMatch',
+          type: type.ofType,
+          description:
+          'Selects documents if element in the array field matches all the specified $elemMatch conditions.'
+        },
+        size: {
+          name: 'size',
+          type: type.ofType,
+          description: 'Selects documents if the array field is a specified size.'
+        }
+      };
+    }
+
+    return args;
   }
 
   /**
@@ -285,6 +447,9 @@ function createTypeContext(cache = typeCache) {
       if (!graphQLField.resolve) {
         graphQLField.resolve = addHooks((source) => source[name], hooks);
       }
+
+      // 查询改到字段参数上
+      graphQLField.args = getFieldArguments(graphQLField);
 
       graphQLFields[name] = graphQLField;
       // debug('create graphQLField', name, graphQLField);

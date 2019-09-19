@@ -1,6 +1,8 @@
 import { forEach, isArray, isString } from 'lodash';
 import { fromGlobalId, toGlobalId } from 'graphql-relay';
 import getFieldList from './projection';
+import getFilterObject from './selector';
+import getSortObject from './sort';
 import viewer from '../model/viewer';
 
 function processId({ id, _id = id }) {
@@ -172,12 +174,14 @@ function getListResolver(graffitiModel) {
       args.id = ids;
     }
 
-    const { orderBy: sort } = args;
-    delete args.orderBy;
+    const { limit, skip } = args;
+    // 从info里收集字段参数组成
+    const selector = getFilterObject(info);
+    const sort = getSortObject(info);
 
     const Collection = graffitiModel.model;
     if (Collection) {
-      return getList(Collection, args, { sort }, context, info);
+      return getList(Collection, selector, { sort, limit, skip }, context, info);
     }
 
     return null;
@@ -272,7 +276,13 @@ async function connectionFromModel(graffitiModel, args, context, info) {
     return emptyConnection();
   }
 
-  const { before, after, first, last, id, orderBy = { _id: 1 }, ...selector } = args;
+  const { before, after, first, last, id } = args;
+
+  // 从info里收集字段参数组成
+  // 从edges.node中获取selector和sort
+  const nodeSelectionSet = info.fieldNodes[0].selectionSet.selections[0].selectionSet.selections[0].selectionSet;
+  const selector = getFilterObject(info, nodeSelectionSet);
+  const sort = getSortObject(info, nodeSelectionSet);
 
   const begin = getId(after);
   const end = getId(before);
@@ -294,10 +304,11 @@ async function connectionFromModel(graffitiModel, args, context, info) {
     selector._id.$lt = end;
   }
 
+
   const result = await getList(Collection, selector, {
     limit,
     skip: offset,
-    sort: orderBy
+    sort
   }, context, info);
   const count = await getCount(Collection, selector);
 
