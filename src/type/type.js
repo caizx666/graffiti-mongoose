@@ -214,7 +214,7 @@ function createTypeContext(cache = typeCache) {
       const fields = getTypeFields(type);
       debug('create input', name);
       inputByTypes[name] = new GraphQLInputObjectType({
-        name: `inputBy${name}`,
+        name: `inputFor${name}`,
         fields: reduce(fields, (inputs, field) => ({
           ...inputs,
           [field.name]: { type: createInputObject(field.type) }
