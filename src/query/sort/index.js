@@ -72,10 +72,10 @@ function getSortObject(info, fieldNodes, parentName) {
     }
   }, []);
 
-  return orderBy(fieldArr, ['order', 'name', 'value'], ['asc']).reduce((sorts, it) => ({
+  return orderBy(fieldArr, ['order', 'name', 'value'], ['asc']).reduce((sorts, it) => (it.name ? {
     ...sorts,
     [it.name]: it.value
-  }), {});
+  } : sorts), {});
 }
 
 export default getSortObject;

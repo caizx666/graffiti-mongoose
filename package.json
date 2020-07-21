@@ -1,6 +1,6 @@
 {
   "name": "saas-plat-graffiti-mongoose",
-  "version": "6.0.14",
+  "version": "6.0.15",
   "description": "Mongoose adapter for graffiti (Node.js GraphQL ORM)",
   "main": "lib/index.js",
   "scripts": {
