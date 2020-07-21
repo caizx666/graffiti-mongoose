@@ -1,5 +1,5 @@
 {
-  "name": "saas-plat-graffiti-mongoose",
+  "name": "graffiti-mongoose-hotfix",
   "version": "6.0.15",
   "description": "Mongoose adapter for graffiti (Node.js GraphQL ORM)",
   "main": "lib/index.js",
