@@ -6,7 +6,6 @@
   "scripts": {
     "test": "set NODE_ENV=test mocha --compilers js:babel-register 'src/**/*.spec.js'",
     "lint": "eslint src",
-    "pub": "npm publish --registry https://npm.saas-plat.com",
     "prepublish": "npm run build",
     "build": "rm -rf lib/* && babel src --ignore *.spec.js --out-dir lib",
     "dev": "babel src --ignore *.spec.js --out-dir ../saas-plat-query/node_modules/saas-plat-graffiti-mongoose/lib",
